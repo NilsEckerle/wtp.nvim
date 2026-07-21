@@ -137,4 +137,20 @@ function M.delete(opts)
 		:find()
 end
 
+function M.init()
+	vim.ui.input({
+		prompt = "Worktree base_dir: ",
+		default = worktree.DEFAULT_BASE_DIR,
+	}, function(base_dir)
+		if base_dir == nil then
+			return
+		end -- cancelled
+		local _, err = worktree.init(vim.trim(base_dir))
+		if err then
+			return notify_err(err)
+		end
+		vim.notify("wtp: initialized .wtp.yml (base_dir: " .. vim.trim(base_dir) .. ")")
+	end)
+end
+
 return M
