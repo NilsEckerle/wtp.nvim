@@ -61,8 +61,17 @@ function M.resolve(entry)
 	return vim.trim(out), nil
 end
 
-function M.add(branch)
-	local args = vim.list_extend({ "add", branch }, config.options.add_args or {})
+function M.add(branch, opts)
+	opts = opts or {}
+	local args = { "add" }
+	if opts.create then
+		table.insert(args, "-b")
+		table.insert(args, branch)
+	end
+	vim.list_extend(args, config.options.add_args or {})
+	if not opts.create then
+		table.insert(args, branch)
+	end
 	local out, err = run(args)
 	if not out then
 		return nil, err
