@@ -19,6 +19,7 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
   cmd = { "WtpInit", "WtpBare", "WtpSwitch", "WtpCreate", "WtpDelete" },
   keys = {
     { "<leader>wi", "<cmd>WtpInit<cr>", desc = "Init wtp config" },
+    { "<leader>wb", "<cmd>WtpBare<cr>", desc = "Convert to bare layout" },
     { "<leader>ws", "<cmd>WtpSwitch<cr>", desc = "Switch worktree" },
     { "<leader>wc", "<cmd>WtpCreate<cr>", desc = "Create worktree" },
     { "<leader>wd", "<cmd>WtpDelete<cr>", desc = "Delete worktree" },
@@ -56,10 +57,11 @@ require("wtp").setup({
   -- executable to invoke
   cmd = "wtp",
 
-  -- called with the resolved absolute path after selecting a worktree
-  on_switch = function(path)
-    vim.cmd.tcd(vim.fn.fnameescape(path))
-  end,
+  -- called with the resolved absolute path after selecting a worktree.
+  -- the default changes the tab-local directory and relocates open buffers
+  -- (including oil:// directory views) to their counterparts in the new
+  -- worktree, falling back to the nearest existing parent directory.
+  on_switch = function(path) ... end,
 
   -- ask before removing
   confirm_delete = true,
@@ -68,6 +70,8 @@ require("wtp").setup({
   add_args = {},
 })
 ```
+
+Overriding `on_switch` replaces the buffer-following behaviour entirely.
 
 ### Recipes
 
@@ -101,6 +105,16 @@ The plugin shells out to the `wtp` CLI rather than manipulating git directly:
 - `wtp cd <branch>` — resolves a selection to an absolute path
 - `wtp add <branch>` — creates
 - `wtp remove <branch>` — deletes
+
+## Buffer following
+
+After switching, open buffers are re-pointed at the equivalent path in the new
+worktree:
+
+- files that exist in both worktrees are reloaded in place
+- files with no counterpart open the nearest existing parent directory
+- `oil://` buffers follow the same rules and stay in oil
+- modified buffers are left untouched
 
 ## Converting to a bare layout
 
