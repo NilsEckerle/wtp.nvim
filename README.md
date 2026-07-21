@@ -16,7 +16,7 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 {
   "NilsEckerle/wtp.nvim",
   dependencies = { "nvim-telescope/telescope.nvim" },
-  cmd = { "WtpInit", "WtpSwitch", "WtpCreate", "WtpDelete" },
+  cmd = { "WtpInit", "WtpBare", "WtpSwitch", "WtpCreate", "WtpDelete" },
   keys = {
     { "<leader>wi", "<cmd>WtpInit<cr>", desc = "Init wtp config" },
     { "<leader>ws", "<cmd>WtpSwitch<cr>", desc = "Switch worktree" },
@@ -32,6 +32,7 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 | Command | Description |
 | --- | --- |
 | `:WtpInit` | Generate `.wtp.yml`, prompting for the worktree base directory |
+| `:WtpBare` | Convert the repo to a bare layout, moving the current branch into a worktree |
 | `:WtpSwitch` | Pick a worktree and change directory to it |
 | `:WtpCreate` | Prompt for a branch name and create a worktree |
 | `:WtpDelete` | Pick a worktree and remove it |
@@ -40,6 +41,7 @@ Lua API:
 
 ```lua
 require("wtp").init()
+require("wtp").bare()
 require("wtp").switch()
 require("wtp").create()
 require("wtp").delete()
@@ -99,6 +101,26 @@ The plugin shells out to the `wtp` CLI rather than manipulating git directly:
 - `wtp cd <branch>` — resolves a selection to an absolute path
 - `wtp add <branch>` — creates
 - `wtp remove <branch>` — deletes
+
+## Converting to a bare layout
+
+`:WtpBare` restructures a normal clone into the bare layout that worktree
+workflows assume:
+
+```
+repo/
+├── .git/            # now bare
+└── worktrees/
+    └── main/        # your former working tree
+```
+
+It refuses to run if the working tree is dirty or HEAD is detached. Commit or
+stash first.
+
+**This is destructive.** It sets `core.bare`, deletes the tracked files from the
+repository root, and creates a worktree for the branch you were on. Untracked
+and ignored files are left in place at the root and are *not* moved into the new
+worktree — move them manually afterwards if you need them.
 
 ## Known limitations
 
