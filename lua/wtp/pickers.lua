@@ -1,0 +1,134 @@
+local config = require("wtp.config")
+local worktree = require("wtp.worktree")
+
+local pickers = require("telescope.pickers")
+local finders = require("telescope.finders")
+local conf = require("telescope.config").values
+local actions = require("telescope.actions")
+local action_state = require("telescope.actions.state")
+local entry_display = require("telescope.pickers.entry_display")
+
+local M = {}
+
+local displayer = entry_display.create({
+	separator = "  ",
+	items = {
+		{ width = 30 },
+		{ width = 10 },
+		{ remaining = true },
+	},
+})
+
+local function make_display(entry)
+	local wt = entry.value
+	return displayer({
+		{ wt.branch, wt.current and "TelescopeResultsIdentifier" or "" },
+		{ wt.status, wt.status == "managed" and "Comment" or "WarningMsg" },
+		wt.path,
+	})
+end
+
+local function entry_maker(wt)
+	return {
+		value = wt,
+		display = make_display,
+		ordinal = wt.branch .. " " .. wt.path,
+	}
+end
+
+local function notify_err(err)
+	vim.notify("wtp: " .. tostring(err), vim.log.levels.ERROR)
+end
+
+function M.switch(opts)
+	opts = opts or {}
+	local items, err = worktree.list()
+	if not items then
+		return notify_err(err)
+	end
+
+	pickers
+		.new(opts, {
+			prompt_title = "Worktrees",
+			finder = finders.new_table({ results = items, entry_maker = entry_maker }),
+			sorter = conf.generic_sorter(opts),
+			attach_mappings = function(bufnr)
+				actions.select_default:replace(function()
+					local selection = action_state.get_selected_entry()
+					actions.close(bufnr)
+					if not selection then
+						return
+					end
+					local path, rerr = worktree.resolve(selection.value)
+					if not path then
+						return notify_err(rerr)
+					end
+					config.options.on_switch(path)
+				end)
+				return true
+			end,
+		})
+		:find()
+end
+
+function M.create()
+	vim.ui.input({ prompt = "New worktree branch: " }, function(branch)
+		if not branch or vim.trim(branch) == "" then
+			return
+		end
+		local _, err = worktree.add(vim.trim(branch))
+		if err then
+			return notify_err(err)
+		end
+		vim.notify("wtp: created " .. branch)
+	end)
+end
+
+function M.delete(opts)
+	opts = opts or {}
+	local items, err = worktree.list()
+	if not items then
+		return notify_err(err)
+	end
+
+	pickers
+		.new(opts, {
+			prompt_title = "Delete Worktree",
+			finder = finders.new_table({ results = items, entry_maker = entry_maker }),
+			sorter = conf.generic_sorter(opts),
+			attach_mappings = function(bufnr)
+				actions.select_default:replace(function()
+					local selection = action_state.get_selected_entry()
+					actions.close(bufnr)
+					if not selection then
+						return
+					end
+
+					local wt = selection.value
+					local function do_remove()
+						local _, rerr = worktree.remove(wt.branch)
+						if rerr then
+							return notify_err(rerr)
+						end
+						vim.notify("wtp: removed " .. wt.branch)
+					end
+
+					if config.options.confirm_delete then
+						vim.ui.select({ "yes", "no" }, {
+							prompt = "Remove worktree " .. wt.branch .. "?",
+						}, function(choice)
+							if choice == "yes" then
+								do_remove()
+							end
+						end)
+					else
+						do_remove()
+					end
+				end)
+				return true
+			end,
+		})
+		:find()
+end
+
+return M
