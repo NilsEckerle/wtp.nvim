@@ -80,7 +80,9 @@ function M.create()
 
 		local _, err = worktree.add(branch, { create = true })
 		if err then
-			-- branch already exists: retry as checkout
+			if err:match("destination path already exists") then
+				return notify_err(err)
+			end
 			local _, err2 = worktree.add(branch, { create = false })
 			if err2 then
 				return notify_err(err2)
@@ -150,6 +152,31 @@ function M.init()
 			return notify_err(err)
 		end
 		vim.notify("wtp: initialized .wtp.yml (base_dir: " .. vim.trim(base_dir) .. ")")
+	end)
+end
+
+function M.bare()
+	vim.ui.select({ "no", "yes" }, {
+		prompt = "Convert this repo to a bare worktree layout?",
+	}, function(choice)
+		if choice ~= "yes" then
+			return
+		end
+
+		vim.ui.input({
+			prompt = "Base directory: ",
+			default = "worktrees",
+		}, function(base_dir)
+			if base_dir == nil then
+				return
+			end
+			local dest, err = worktree.to_bare(vim.trim(base_dir))
+			if err then
+				return notify_err(err)
+			end
+			vim.notify("wtp: converted to bare; worktree at " .. dest)
+			config.options.on_switch(dest)
+		end)
 	end)
 end
 
