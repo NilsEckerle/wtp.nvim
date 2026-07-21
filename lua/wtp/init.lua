@@ -16,5 +16,8 @@ end
 M.init = function()
 	require("wtp.pickers").init()
 end
+M.bare = function()
+	require("wtp.pickers").bare()
+end
 
 return M
