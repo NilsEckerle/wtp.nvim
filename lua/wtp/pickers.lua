@@ -76,9 +76,15 @@ function M.create()
 		if not branch or vim.trim(branch) == "" then
 			return
 		end
-		local _, err = worktree.add(vim.trim(branch))
+		branch = vim.trim(branch)
+
+		local _, err = worktree.add(branch, { create = true })
 		if err then
-			return notify_err(err)
+			-- branch already exists: retry as checkout
+			local _, err2 = worktree.add(branch, { create = false })
+			if err2 then
+				return notify_err(err2)
+			end
 		end
 		vim.notify("wtp: created " .. branch)
 	end)
