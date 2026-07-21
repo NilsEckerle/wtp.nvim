@@ -1,43 +1,64 @@
 local M = {}
 
+local OIL_PREFIX = "oil://"
+
+local function is_oil(buf)
+	return vim.api.nvim_buf_get_name(buf):sub(1, #OIL_PREFIX) == OIL_PREFIX
+end
+
 local function is_relocatable(buf)
-	return vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].buftype == "" and not vim.bo[buf].modified
+	if not vim.api.nvim_buf_is_loaded(buf) then
+		return false
+	end
+	if is_oil(buf) then
+		return true
+	end
+	return vim.bo[buf].buftype == "" and not vim.bo[buf].modified
 end
 
 --- Map a buffer path from one worktree root to another.
 --- Falls back to the deepest existing ancestor directory.
+--- Handles oil:// URLs by stripping and restoring the scheme.
 --- Returns nil if the buffer is outside `old_root`.
 local function mapped_path(buf, old_root, new_root)
 	local name = vim.api.nvim_buf_get_name(buf)
+	local oil = is_oil(buf)
+	if oil then
+		name = name:sub(#OIL_PREFIX + 1)
+		name = name:gsub("/$", "")
+	end
+
 	if name:sub(1, #old_root) ~= old_root then
 		return nil
 	end
 
 	local rel = name:sub(#old_root + 2)
 	if rel == "" then
-		return nil
+		return oil and (OIL_PREFIX .. new_root) or nil
 	end
 
 	local candidate = vim.fs.joinpath(new_root, rel)
-	if vim.uv.fs_stat(candidate) then
-		return candidate
-	end
-
-	-- walk up until something exists; new_root itself always does
-	local dir = vim.fs.dirname(candidate)
-	while dir and #dir >= #new_root do
-		if vim.uv.fs_stat(dir) then
-			return dir
+	if not vim.uv.fs_stat(candidate) then
+		local dir = vim.fs.dirname(candidate)
+		while dir and #dir >= #new_root do
+			if vim.uv.fs_stat(dir) then
+				candidate = dir
+				break
+			end
+			dir = vim.fs.dirname(dir)
 		end
-		dir = vim.fs.dirname(dir)
+		if not vim.uv.fs_stat(candidate) then
+			candidate = new_root
+		end
 	end
 
-	return new_root
+	return oil and (OIL_PREFIX .. candidate) or candidate
 end
 
 local function relocate_buffer(buf, new_path)
-	if vim.fn.isdirectory(new_path) == 1 then
-		-- replace the stale buffer with a directory view in its windows
+	local oil = new_path:sub(1, #OIL_PREFIX) == OIL_PREFIX
+
+	if oil or vim.fn.isdirectory(new_path) == 1 then
 		for _, win in ipairs(vim.fn.win_findbuf(buf)) do
 			vim.api.nvim_win_call(win, function()
 				vim.cmd.edit(vim.fn.fnameescape(new_path))
