@@ -14,3 +14,7 @@ end, {})
 vim.api.nvim_create_user_command("WtpDelete", function()
 	require("wtp.pickers").delete()
 end, {})
+
+vim.api.nvim_create_user_command("WtpInit", function()
+	require("wtp.pickers").init()
+end, {})
