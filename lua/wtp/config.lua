@@ -5,7 +5,8 @@ local function is_relocatable(buf)
 end
 
 --- Map a buffer path from one worktree root to another.
---- Returns nil if the buffer is outside `old_root` or has no counterpart.
+--- Falls back to the deepest existing ancestor directory.
+--- Returns nil if the buffer is outside `old_root`.
 local function mapped_path(buf, old_root, new_root)
 	local name = vim.api.nvim_buf_get_name(buf)
 	if name:sub(1, #old_root) ~= old_root then
@@ -17,8 +18,21 @@ local function mapped_path(buf, old_root, new_root)
 		return nil
 	end
 
-	local new_path = vim.fs.joinpath(new_root, rel)
-	return vim.uv.fs_stat(new_path) and new_path or nil
+	local candidate = vim.fs.joinpath(new_root, rel)
+	if vim.uv.fs_stat(candidate) then
+		return candidate
+	end
+
+	-- walk up until something exists; new_root itself always does
+	local dir = vim.fs.dirname(candidate)
+	while dir and #dir >= #new_root do
+		if vim.uv.fs_stat(dir) then
+			return dir
+		end
+		dir = vim.fs.dirname(dir)
+	end
+
+	return new_root
 end
 
 local function relocate_buffer(buf, new_path)
