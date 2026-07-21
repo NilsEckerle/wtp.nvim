@@ -140,6 +140,11 @@ function M.delete(opts)
 end
 
 function M.init()
+	local root = vim.fn.getcwd()
+	if vim.uv.fs_stat(vim.fs.joinpath(root, ".wtp.yml")) then
+		return notify_err(".wtp.yml already exists")
+	end
+
 	vim.ui.input({
 		prompt = "Worktree base_dir: ",
 		default = worktree.DEFAULT_BASE_DIR,
