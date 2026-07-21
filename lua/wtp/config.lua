@@ -36,6 +36,19 @@ local function mapped_path(buf, old_root, new_root)
 end
 
 local function relocate_buffer(buf, new_path)
+	if vim.fn.isdirectory(new_path) == 1 then
+		-- replace the stale buffer with a directory view in its windows
+		for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+			vim.api.nvim_win_call(win, function()
+				vim.cmd.edit(vim.fn.fnameescape(new_path))
+			end)
+		end
+		if vim.api.nvim_buf_is_valid(buf) then
+			vim.api.nvim_buf_delete(buf, { force = true })
+		end
+		return
+	end
+
 	vim.api.nvim_buf_set_name(buf, new_path)
 	vim.api.nvim_buf_call(buf, function()
 		vim.cmd.edit()
