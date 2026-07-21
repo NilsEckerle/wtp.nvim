@@ -2,6 +2,8 @@ local config = require("wtp.config")
 
 local M = {}
 
+M.DEFAULT_BASE_DIR = "../worktrees"
+
 local function run(args)
 	local cmd = vim.list_extend({ config.options.cmd or "wtp" }, args)
 	local out = vim.system(cmd, { text = true }):wait()
@@ -133,6 +135,101 @@ function M.init(base_dir)
 	return vim.trim(out), nil
 end
 
-M.DEFAULT_BASE_DIR = "../worktrees"
+local function git(args)
+	local out = vim.system(vim.list_extend({ "git" }, args), { text = true }):wait()
+	if out.code ~= 0 then
+		local msg = (out.stderr ~= "" and out.stderr) or out.stdout or "unknown error"
+		return nil, vim.trim(msg)
+	end
+	return vim.trim(out.stdout or ""), nil
+end
+
+local function is_dirty()
+	local out, err = git({ "status", "--porcelain" })
+	if not out then
+		return nil, err
+	end
+	return out ~= "", nil
+end
+
+local function current_branch()
+	return git({ "rev-parse", "--abbrev-ref", "HEAD" })
+end
+
+--- Convert the repository to a bare layout, moving the current branch
+--- into a worktree under base_dir.
+function M.to_bare(base_dir)
+	base_dir = base_dir or "worktrees"
+
+	local root, err = git({ "rev-parse", "--show-toplevel" })
+	if not root then
+		return nil, err
+	end
+
+	local bare, berr = git({ "rev-parse", "--is-bare-repository" })
+	if not bare then
+		return nil, berr
+	end
+	if bare == "true" then
+		return nil, "repository is already bare"
+	end
+
+	local dirty, derr = is_dirty()
+	if dirty == nil then
+		return nil, derr
+	end
+	if dirty then
+		return nil, "working tree is dirty; commit or stash before converting"
+	end
+
+	local branch, brerr = current_branch()
+	if not branch then
+		return nil, brerr
+	end
+	if branch == "HEAD" then
+		return nil, "detached HEAD; check out a branch first"
+	end
+
+	-- 1. mark the repo bare
+	local _, cerr = git({ "config", "core.bare", "true" })
+	if cerr then
+		return nil, cerr
+	end
+
+	-- 2. remove the old working tree files (tracked only; .git is untouched)
+	local files, ferr = git({ "ls-files" })
+	if not files then
+		return nil, ferr
+	end
+
+	local dirs = {}
+	for line in files:gmatch("[^\r\n]+") do
+		os.remove(vim.fs.joinpath(root, line))
+		local dir = vim.fs.dirname(line)
+		while dir and dir ~= "." and dir ~= "" do
+			dirs[dir] = true
+			dir = vim.fs.dirname(dir)
+		end
+	end
+
+	-- delete deepest-first so parents empty out before we try them
+	local ordered = vim.tbl_keys(dirs)
+	table.sort(ordered, function(a, b)
+		return #a > #b
+	end)
+	for _, dir in ipairs(ordered) do
+		vim.uv.fs_rmdir(vim.fs.joinpath(root, dir))
+	end
+
+	-- 3. create the worktree for the branch we were on
+	local dest = vim.fs.joinpath(root, base_dir, branch)
+	local _, werr = git({ "worktree", "add", dest, branch })
+	if werr then
+		git({ "config", "core.bare", "false" }) -- best-effort rollback
+		return nil, "worktree add failed: " .. werr
+	end
+
+	return dest, nil
+end
 
 return M
