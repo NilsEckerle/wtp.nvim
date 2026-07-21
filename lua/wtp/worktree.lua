@@ -87,4 +87,52 @@ function M.remove(branch)
 	return vim.trim(out), nil
 end
 
+local function git_root()
+	local out = vim.system({ "git", "rev-parse", "--show-toplevel" }, { text = true }):wait()
+	if out.code ~= 0 then
+		return nil
+	end
+	local root = vim.trim(out.stdout or "")
+	return root ~= "" and root or nil
+end
+
+function M.init(base_dir)
+	local out, err = run({ "init" })
+	if not out then
+		return nil, err
+	end
+
+	if not base_dir or base_dir == "" then
+		return vim.trim(out), nil
+	end
+
+	local root = git_root()
+	if not root then
+		return nil, "not inside a git repository"
+	end
+
+	local path = vim.fs.joinpath(root, ".wtp.yml")
+	local ok, lines = pcall(vim.fn.readfile, path)
+	if not ok then
+		return nil, "could not read " .. path
+	end
+
+	local replaced = false
+	for i, line in ipairs(lines) do
+		if line:match("^%s*base_dir:") then
+			lines[i] = line:gsub("(base_dir:).*", "%1 " .. base_dir)
+			replaced = true
+			break
+		end
+	end
+	if not replaced then
+		return nil, "base_dir key not found in .wtp.yml"
+	end
+
+	vim.fn.writefile(lines, path)
+	return vim.trim(out), nil
+end
+
+M.DEFAULT_BASE_DIR = "../worktrees"
+
 return M
