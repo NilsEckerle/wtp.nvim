@@ -18,3 +18,7 @@ end, {})
 vim.api.nvim_create_user_command("WtpInit", function()
 	require("wtp.pickers").init()
 end, {})
+
+vim.api.nvim_create_user_command("WtpBare", function()
+	require("wtp.pickers").bare()
+end, {})
