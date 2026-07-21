@@ -16,8 +16,9 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 {
   "NilsEckerle/wtp.nvim",
   dependencies = { "nvim-telescope/telescope.nvim" },
-  cmd = { "WtpSwitch", "WtpCreate", "WtpDelete" },
+  cmd = { "WtpInit", "WtpSwitch", "WtpCreate", "WtpDelete" },
   keys = {
+    { "<leader>wi", "<cmd>WtpInit<cr>", desc = "Init wtp config" },
     { "<leader>ws", "<cmd>WtpSwitch<cr>", desc = "Switch worktree" },
     { "<leader>wc", "<cmd>WtpCreate<cr>", desc = "Create worktree" },
     { "<leader>wd", "<cmd>WtpDelete<cr>", desc = "Delete worktree" },
@@ -30,6 +31,7 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 | Command | Description |
 | --- | --- |
+| `:WtpInit` | Generate `.wtp.yml`, prompting for the worktree base directory |
 | `:WtpSwitch` | Pick a worktree and change directory to it |
 | `:WtpCreate` | Prompt for a branch name and create a worktree |
 | `:WtpDelete` | Pick a worktree and remove it |
@@ -37,6 +39,7 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 Lua API:
 
 ```lua
+require("wtp").init()
 require("wtp").switch()
 require("wtp").create()
 require("wtp").delete()
@@ -91,6 +94,7 @@ opts = {
 
 The plugin shells out to the `wtp` CLI rather than manipulating git directly:
 
+- `wtp init` — generates `.wtp.yml`; the plugin then patches `base_dir` to your answer
 - `wtp list` — parsed for the picker
 - `wtp cd <branch>` — resolves a selection to an absolute path
 - `wtp add <branch>` — creates
