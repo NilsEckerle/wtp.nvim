@@ -13,5 +13,8 @@ end
 M.delete = function(opts)
 	require("wtp.pickers").delete(opts)
 end
+M.init = function()
+	require("wtp.pickers").init()
+end
 
 return M
