@@ -99,6 +99,16 @@ local function git_root()
 end
 
 function M.init(base_dir)
+	local root = git_root()
+	if not root then
+		return nil, "not inside a git repository"
+	end
+
+	local path = vim.fs.joinpath(root, ".wtp.yml")
+	if vim.uv.fs_stat(path) then
+		return nil, ".wtp.yml already exists at " .. path
+	end
+
 	local out, err = run({ "init" })
 	if not out then
 		return nil, err
@@ -108,12 +118,6 @@ function M.init(base_dir)
 		return vim.trim(out), nil
 	end
 
-	local root = git_root()
-	if not root then
-		return nil, "not inside a git repository"
-	end
-
-	local path = vim.fs.joinpath(root, ".wtp.yml")
 	local ok, lines = pcall(vim.fn.readfile, path)
 	if not ok then
 		return nil, "could not read " .. path
